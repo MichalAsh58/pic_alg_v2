@@ -27,7 +27,7 @@ def merge_tables(path1,path2,path3):
     df1=pd.read_excel(path1)
     df2=pd.read_excel(path2)
     df3=pd.read_excel(path3)
-
+    # test
     DF=pd.concat([df1,df2,df3])
     print("merged table",DF.shape)
     # DF.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/MERGED.xlsx",index=False)
