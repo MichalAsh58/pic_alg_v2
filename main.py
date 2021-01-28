@@ -30,11 +30,17 @@ from tables_creation import EAT_Table,LEAP_db,Katz_db,CARE_data
 
 def Type(type,df):
     col_names=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
+    col_names.remove(type)
+    df=df.drop(columns=col_names)
+    print(type, df.shape)
+    df=df.dropna()
+    print(df.shape)
     y=df[type]
-    X=df.drop(columns=col_names)
+    X=df.drop(columns=[type])
     fullname = type.replace("FA", "Food Allergy")
     fullname = fullname.replace("_", " ")
     fullname = fullname.replace("SCORAD", "Atopic Dermatitis")
+    return X,y, fullname
 
 def Savemodel_DNN(model,name):
     path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-DNN-{name}'
@@ -395,7 +401,7 @@ def DNN_regress(X_train,X_test,y_train,y_test, parameters,name,fullname):
     plt.xlabel("Test Set")
     plt.ylabel("Prdiction- binary")
     # plt.show()
-    plt.savefig(f'{path}/{name}-results-DNN.jpeg')
+    plt.savefig(f'{path}/{fullname}-results-DNN.jpeg')
 
     logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > 0, 1, 0), y_pred)))
     fpr, tpr, thresholds = roc_curve(np.where(y_test > 0, 1, 0), y_pred)
@@ -470,7 +476,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     plt.plot(y_test,y_pred,'o')
     plt.xlabel("Test Set")
     plt.ylabel("Prdiction- binary")
-    plt.title(f'{name}- results')
+    plt.title(f'{fullname}- results')
     # plt.show()
     plt.savefig(f'{path}/{name}-results-RandomForest.jpeg')
 
@@ -533,27 +539,21 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
         json.dump(parameters, fp)
 
 if __name__ == '__main__':
-    df=pd.read_excel("./ELK_tableFalse.xlsx")
+    df=pd.read_excel("ELK_tablesFalse.xlsx")
     types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
+    for t in types:
+        X,y, fullname=Type(t,df)
+        y=np.where(y > 0, 1, 0)
+        test_size = 0.2
+        epochs = 20
+        n_estimators = 1000
+        lr = 0.0001
+        parametrs_DNN = {"description": "", "test_size": test_size, "#epochs": epochs, "learning rate": lr}
+        parametrs_RF = {"description": "", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
 
-
-
-
-    multi_df=pd.read_excel("./multimorbidityTable_2.xlsx")
-    print(multi_df.shape)
-    y=multi_df["primary outcome positive (only those evaluable and within age range)"]
-    y=np.where(y > 0, 1, 0)
-    X=multi_df.drop(columns=["primary outcome positive (only those evaluable and within age range)"])
-    test_size = 0.2
-    epochs = 20
-    n_estimators = 1000
-    lr = 0.0001
-    parametrs_DNN = {"description": "", "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-    parametrs_RF = {"description": "", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=parametrs_DNN["test_size"], stratify=y)
-    Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='Multimorbidity',fullname='Multimorbidity')
-    DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name='Multimorbidity',fullname='Multimorbidity')
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=parametrs_DNN["test_size"], stratify=y)
+        Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=t,fullname=fullname)
+        DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
     # FA, label, name,fullname=Type('AD')
     #

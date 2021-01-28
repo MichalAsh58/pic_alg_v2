@@ -213,7 +213,7 @@ def Katz_db(path_KATZ,late_intro):
     df["ethnicity_2"] = int(0)
     df["ethnicity_3"] = int(0)
     df["ethnicity_4"] = int(1)
-    df["FA_milk"]=df["FA_general"]
+    df["FA_Milk"]=df["FA_general"]
     df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
     print("KATZ table", df.shape)
     # if FA:
@@ -223,7 +223,7 @@ def Katz_db(path_KATZ,late_intro):
 
 def cofar2_Table(path_cofar,late_intro):
     df1 = pd.read_excel(path_cofar, sheet_name="Attributes1", usecols="A:D,F:H,J:N,Q,V,X,AB:AD")
-    df2 = pd.read_excel(path_cofar, sheet_name="Attributes_to_be_Condensed", usecols="A:C")
+    df2 = pd.read_excel(path_cofar, sheet_name="Attributes_to_be_Condensed", usecols="A,C,D")
     df2=df2.groupby('Accession').first()
     df=pd.merge(df1, df2, on='Accession', left_index=True)
 
