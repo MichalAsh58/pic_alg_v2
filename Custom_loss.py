@@ -1,9 +1,8 @@
 import keras
 import tensorflow as tf
-import numpy as np
 import keras.backend as K
 
-class WeightedBinaryCrossEntropy(keras.losses.Loss):
+class WeightedBinaryCrossEntropy(tf.keras.metrics.Metric):
     """
     pos_weight: Scalars the effec on loss by the positive class by whatever is passed into it.
     weight: Scalars all the loss. Can be used to increase scalar of negative weight only by passing 1/weight to pos_weight.
@@ -21,9 +20,9 @@ class WeightedBinaryCrossEntropy(keras.losses.Loss):
                 # Manually calculated the weighted cross entropy. Formula is qz * -log(sigmoid(x)) + (1 - z) * -log(1 - sigmoid(x)) where z are labels, x is logits, and q is the weight.
                 # Since the values passed are from sigmoid (assumably in this case) sigmoid(x) will be replaces with y_pred
 
-        print("1")
-        y_pred=tf.dtypes.cast(tf.where(y_pred > 0, 1, 0), tf.float32)
+        y_pred=tf.dtypes.cast(tf.where(y_pred > 0., 1, 0), tf.float32)
 
+        # print("ypred= ", y_pred)
 
         TN = tf.math.logical_and(K.eval(y_true) == 0, K.eval(y_pred) == 0)
         TN=tf.reduce_sum(tf.cast(TN,tf.float32))
@@ -37,15 +36,21 @@ class WeightedBinaryCrossEntropy(keras.losses.Loss):
         FN=tf.reduce_sum(tf.cast(FN,tf.float32))
 
 
-        print("TN=",TN)
-        print("FP=",FP)
-        print("TP=",TP)
-        print("FN=",FN)
+        # print("TN=",TN)
+        # print("FP=",FP)
+        # print("TP=",TP)
+        # print("FN=",FN)
         specificity = K.sum(TN) / (K.sum(TN) + K.sum(FP) + K.epsilon())
         recall = K.sum(TP) / (K.sum(TP) + K.sum(FN) + K.epsilon())
 
         print("recall=",recall)
         print("specificity=",specificity)
+
+        # loss=1.0 - (self.recall_weight * recall + self.spec_weight * specificity))
+        #
+        # with tf.GradientTape() as tape:
+        #     g = tape.gradient(loss,
+        #
 
         return 1.0 - (self.recall_weight * recall + self.spec_weight * specificity)
 
