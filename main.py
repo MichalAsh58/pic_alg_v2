@@ -5,6 +5,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsRegressor
 from xgboost import XGBClassifier
 import keras.backend as K
 import keras
@@ -28,14 +29,41 @@ from Custum_metric import ConfusionMatrixMetric
 from Custom_loss import WeightedBinaryCrossEntropy
 from tables_creation import EAT_Table,LEAP_db,Katz_db,CARE_data
 
+# function for KNN model-based imputation of missing values using features without NaN as predictors
+def impute_model_basic(df):
+  cols_nan = df.columns[df.isna().any()].tolist()
+  cols_no_nan = df.columns.difference(cols_nan).values
+  for col in cols_nan:
+      test_data = df[df[col].isna()]
+      train_data = df.dropna()
+      knr = KNeighborsRegressor(n_neighbors=5).fit(train_data[cols_no_nan], train_data[col])
+      df.loc[df[col].isna(), col] = knr.predict(test_data[cols_no_nan])
+  return df
+
+# function for KNN model-based imputation of missing values using features without NaN as predictors,
+#   including progressively added imputed features
+def impute_model_progressive(df):
+  cols_nan = df.columns[df.isna().any()].tolist()
+  cols_no_nan = df.columns.difference(cols_nan).values
+  while len(cols_nan)>0:
+      col = cols_nan[0]
+      test_data = df[df[col].isna()]
+      train_data = df.dropna()
+      knr = KNeighborsRegressor(n_neighbors=5).fit(train_data[cols_no_nan], train_data[col])
+      df.loc[df[col].isna(), col] = knr.predict(test_data[cols_no_nan])
+      cols_nan = df.columns[df.isna().any()].tolist()
+      cols_no_nan = df.columns.difference(cols_nan).values
+  return df
+
+
 def Type(type,df):
     col_names=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     col_names.remove(type)
     df=df.drop(columns=col_names)
-    print(type, df.shape)
     df=df.dropna()
-    print(df.shape)
+    print(type, df.shape)
     y=df[type]
+    print(Counter(np.where(y>0,1,0)))
     X=df.drop(columns=[type])
     fullname = type.replace("FA", "Food Allergy")
     fullname = fullname.replace("_", " ")
@@ -471,6 +499,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     y_pred = regressor.predict(X_test)
 
     path=Savemodel_RF(regressor,name)
+    # correlation_matrix(np.array(X_train,y_train), path)
 
     plt.figure()
     plt.plot(y_test,y_pred,'o')
@@ -487,7 +516,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     specificity=[]
     sensitivity=[]
     for threshold in thresholds:
-        tn, fp, fn, tp = confusion_matrix(np.where(y_test > 0, 1, 0), np.where(y_pred > threshold, 1, 0).reshape(-1)).ravel()
+        tn, fp, fn, tp = confusion_matrix(np.where(y_test > 0, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
         accuracy_score=(tn+tp)/(tn+fp+fn+tp)
         specificity_score = tn / (tn + fp)
         sensitivity_score=tp/(tp+fn)
@@ -532,65 +561,100 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     plt.title("Sensitivity vs. Specificity")
     plt.suptitle(f'{fullname}\n #of trees={parameters["n_estimators"]},Max accuracy={float("{:.2f}".format(max(accuracy)))}',fontsize=15)
     plt.savefig(f'{path}/{name}-RandomForest.jpeg')
+    return logit_roc_auc
 
 
     parameters["AUC"]=logit_roc_auc
     with open(f'{path}/parameters.json', 'w') as fp:
         json.dump(parameters, fp)
 
+def correlation_matrix(df,path):
+    from matplotlib import pyplot as plt
+
+    f = plt.figure()
+    plt.matshow(df.corr(), fignum=f.number)
+    plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14,
+               rotation=90)
+    plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
+    cb = plt.colorbar()
+    cb.ax.tick_params(labelsize=14)
+    plt.title('Correlation Matrix', fontsize=16);
+    plt.savefig(f'{path}/CorrelationMatrix.jpeg')
+    # plt.show()
+
+def Validation_RF(model_path,X,y):
+    model = joblib.load(model_path)
+    y_pred=model.predict(X)
+    logit_roc_auc = roc_auc_score(np.where(y > 0, 1, 0), y_pred)
+
+    print(model.score(X, y))
+
+    print(logit_roc_auc)
+
+
 if __name__ == '__main__':
-    df=pd.read_excel("ELK_tablesFalse.xlsx")
-    types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
-    for t in types:
-        X,y, fullname=Type(t,df)
+    path="./02022021False.xlsx"
+    DF=pd.read_excel(path)
+
+    DF=DF.dropna()
+    print(DF.shape)
+    # df1=DF.fillna(DF.mean())
+    # df2=impute_model_basic(DF)
+    # df3=impute_model_progressive(DF)
+    # df["gestational age"]=np.where(df["gestational age"]>=37,1,0)
+    # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
+
+    # for i,df in enumerate([df_dropna,df1,df2,df3]):
+    for i in range(5):
+    # for t in range(100,900,50):
+        print(DF.shape)
+        y=DF["FA_general"]
+        X=DF.drop(columns=["FA_general"])
+        fullname="Food Allergy- general"
+        # X,y, fullname=Type("FA_general",df)
         y=np.where(y > 0, 1, 0)
         test_size = 0.2
-        epochs = 20
-        n_estimators = 1000
+        epochs = 100
+        n_estimators = 250
         lr = 0.0001
-        parametrs_DNN = {"description": "", "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-        parametrs_RF = {"description": "", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
+
+        # Validation_RF("/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/2021-01-28 19:58:03.044301-RF-FA_general/model", X, y)
+
+
+
+        parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
+        parametrs_RF = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=parametrs_DNN["test_size"], stratify=y)
-        Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=t,fullname=fullname)
-        DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
+        auc=Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='FA',fullname=fullname)
+        print(auc)
+        # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
-    # FA, label, name,fullname=Type('AD')
-    #
-    # merged_df=create_tables(run_tables_creation=False,FA=FA)
-    # # print(merged_df.describe())
-    # test_size = 0.2
-    # epochs=100
-    # n_estimators=600
-    # lr = 0.0001
-    # parametrs_DNN={"description":"", "test_size":test_size,"#epochs":epochs,"learning rate":lr}
-    # parametrs_RF={"description":"", "test_size":test_size,"n_estimators":n_estimators,"#epochs":epochs}
-    #
-    # y =merged_df[label]
-    # y_binary=np.where(y > 0, 1, 0)
-    # # print("FA",Counter(np.where(y>0,1,0))) #FA Counter({0: 1135, 1: 260}) (16%)
-    # # print("AD",Counter(np.where(y>0,1,0))) #AD Counter({0: 1018, 1: 448}) (30%)
-    #
-    # X = merged_df.drop(columns=[label])
-    # X_train, X_test, y_train, y_test = train_test_split(X, y_binary, test_size=parametrs_DNN["test_size"], stratify=y_binary)
-    # # SVM_logisticRedression_model(X_train, X_test, y_train, y_test)
-    # # XGBoost_model(X_train, X_test, y_train, y_test)
-    # Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=name,fullname=fullname) #n_estimators
-    # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=name,fullname=fullname) ##epochs, learning rate
-    # # DNN(X_train, X_test, np.where(y_train > 0, 1, 0), np.where(y_test > 0, 1, 0),epochs=200)
+        # parametrs_RF = {"description": "gestational age- boolean", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
+        #
+        # X_train["gestational age"]=np.where(X_train["gestational age"]>=37,int(1),int(0))
+        # X_test["gestational age"]=np.where(X_test["gestational age"]>=37,int(1),int(0))
+        # auc=Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='FA',fullname=fullname)
+        # print(auc)
+        # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
-    # FA, label, name,fullname=Type('FA')
-    # merged_df=create_tables(run_tables_creation=False,FA=FA)
-    # test_size = 0.2
-    # epochs=100
-    # n_estimators=600
-    # lr = 0.001
-    # parametrs_DNN={"description":"", "test_size":test_size,"#epochs":epochs,"learning rate":lr}
-    # parametrs_RF={"description":"", "test_size":test_size,"n_estimators":n_estimators,"#epochs":epochs}
-    # y =merged_df[label]
-    # y_binary=np.where(y > 0, 1, 0)
-    #
-    # X = merged_df.drop(columns=[label])
-    # X_train, X_test, y_train, y_test = train_test_split(X, y_binary, test_size=test_size, stratify=y_binary)
-    # Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=name,fullname=fullname)
-    # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=name,fullname=fullname)
+
+
+    # X, y, fullname = Type("FA_Milk", df)
+    # AUC=[]
+    # partial=X[["mother has eczema", "mother has asthma","any pets owned at enrolment"]]
+    # for i in range(X.shape[1]):
+    #     # print(X.columns[i])
+    #     X_temp=X.drop(X.columns[i], axis=1)
+    #     y=np.where(y > 0, 1, 0)
+    #     test_size = 0.2
+    #     epochs = 227
+    #     n_estimators = 20
+    #     lr = 0.0001
+    #     parametrs_DNN = {"description": "", "test_size": test_size, "#epochs": epochs, "learning rate": lr}
+    #     parametrs_RF = {"description": "", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
+    #     #
+    #     X_train, X_test, y_train, y_test = train_test_split(partial, y, test_size=parametrs_DNN["test_size"], stratify=y)
+    #     AUC.append(Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name="FA_Milk",fullname=fullname))
+    #     print(AUC[-1])
+    # print(AUC)

@@ -54,11 +54,12 @@ def CARE_data():
     df["ethnicity_2"] = int(0)
     df["ethnicity_3"] = int(0)
     df["ethnicity_4"] = int(0)
-    df=df.dropna()
+    df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'],thresh=3)
     # df = df[["Child's sex", "birth weight kg", "gestational age","mother has eczema","father has eczema","mother has asthma","father has asthma","mother has food allergy","father has food allergy","mode of delivery","any pets owned at enrolment",	"Exclusively Breastfed","mother smoked during pregnancy","ethnicity_0","ethnicity_1","ethnicity_2","ethnicity_3","ethnicity_4"]]
     return df
 
 def EAT_Table(path, late_intro):
+    print('EAT')
     # issues-
     # sex- 0=male
     # mode of delivery- 0=vaginal
@@ -78,6 +79,7 @@ def EAT_Table(path, late_intro):
                           "Parent reports child had eczema before enrolment (parent and/or Dr diagnosed)"])
     if late_intro:
         df=df[df["study group"] ==0] #only for multy multimorbidity
+        df=df
     df=df.drop(columns=["study group"])
     #drop for merging disserent tables
 
@@ -98,16 +100,24 @@ def EAT_Table(path, late_intro):
     res = pd.get_dummies(df["ethnicity"], prefix='ethnicity')
     df = df.drop(columns=["ethnicity"])
     df = pd.concat([df, res], axis=1)
-    df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    # df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    df=df.dropna(subset=["FA_general"])
+
+    # df["research"] = "EAT"
     print("EAT table",df.shape)
 
     # if FA:
     #     df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/EAT_FA.xlsx",index=False)
     # else: df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/EAT_AD.xlsx",index=False)
+    # print('general', Counter(df["FA_general"]))
+    # print('MILK', Counter(df["FA_Milk"]))
+    # print('EGG', Counter(df["FA_Egg"]))
+    # print('PEANTUT', Counter(df["FA_Peanut"]))
     return df
 
 
 def LEAP_db(path_LEAP,late_intro):
+    print('LEAP')
     # issues- how do they measure FA development?- BF + HN(allergic)
     # ethnicity- asian, white, black, chinese, mixed- 0/white, 1/mixed, 2/asian or asian british, 3/black or black british, 4/chinese or other ethnic group
     # breastfeeding- here in months for exsclusive- 3 months- binary
@@ -127,7 +137,6 @@ def LEAP_db(path_LEAP,late_intro):
         {'Allergic': True, 'Tolerant': False, 'Indeterminate': None, 0: None})
     df["FA_general"] = np.logical_or(
         df["Egg allergy by protocol definition"], df["Outcome of Peanut OFC at V60 (character)"].fillna(value=False))
-
 
     # drop the irrelevant tagging
     # if FA:
@@ -167,14 +176,21 @@ def LEAP_db(path_LEAP,late_intro):
     df.loc[df['Exclusively Breastfed'] <= 3, 'Exclusively Breastfed'] = int(0)
     df.loc[df['Exclusively Breastfed'] > 3, 'Exclusively Breastfed'] = int(1)
 
-    df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    # df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    df=df.dropna(subset=["FA_general"])
+
+    # df["research"] = "LEAP"
     print("LEAP table", df.shape)
     # if FA:
     #     df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/LEAP_FA.xlsx",index=False)
     # else: df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/LEAP_AD.xlsx",index=False)
+    # print('general', Counter(df["FA_general"]))
+    # print('EGG', Counter(df["FA_Egg"]))
+    # print('PEANTUT', Counter(df["FA_Peanut"]))
     return df
 
 def Katz_db(path_KATZ,late_intro):
+    print('KATZ')
     # issues-all i nemail from Michael "Assaf Harofeh Database"
 
     df = pd.read_excel(path_KATZ, usecols="A,E,G:H,J:L,O,S,W,AB,AD:AF,AZ:BB,BU,BX,CC")  # child history: CC:CE
@@ -204,7 +220,11 @@ def Katz_db(path_KATZ,late_intro):
     df.loc[df['Exclusively Breastfed'] > 90, 'Exclusively Breastfed'] = int(1)
 
     # df = df.dropna()
-
+    df["mother has asthma"]=df["mother has asthma"].map({3:int(1),6:int(1),7:int(1),8:int(1)})
+    df["mother has eczema"]=df["mother has eczema"].map({4:int(1)})
+    df["mother has food allergy"]=df["mother has food allergy"].map({6:int(1)})
+    df["father has food allergy"]=df["father has food allergy"].map({6:int(1)})
+    df["father has asthma"]=df["father has asthma"].map({3:int(1),6:int(1),11:int(1),13:int(1)})
     df["any pets owned at enrolment"] = np.logical_or(df["pets at yard"], df["pets at home"])
     df = df.drop(columns=["pets at yard", "pets at home"])
 
@@ -213,16 +233,21 @@ def Katz_db(path_KATZ,late_intro):
     df["ethnicity_2"] = int(0)
     df["ethnicity_3"] = int(0)
     df["ethnicity_4"] = int(1)
+    # df["research"] = "Katz"
     df["FA_Milk"]=df["FA_general"]
-    df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    # df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    df=df.dropna(subset=["FA_general"])
     print("KATZ table", df.shape)
     # if FA:
     #     df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/KATZ_FA.xlsx",index=False)
     # else: df.to_excel("/home/michal/MYOR Dropbox/R&D/Partnerships/Tables/KATZ_AD.xlsx",index=False)
+    # print('general', Counter(df["FA_general"]))
+    # print('MILK', Counter(df["FA_Milk"]))
     return df
 
 def cofar2_Table(path_cofar,late_intro):
-    df1 = pd.read_excel(path_cofar, sheet_name="Attributes1", usecols="A:D,F:H,J:N,Q,V,X,AB:AD")
+    print('CoFar')
+    df1 = pd.read_excel(path_cofar, sheet_name="Attributes1", usecols="A:D,F:H,J:N,Q,V,X,AA,AB,AD")
     df2 = pd.read_excel(path_cofar, sheet_name="Attributes_to_be_Condensed", usecols="A,C,D")
     df2=df2.groupby('Accession').first()
     df=pd.merge(df1, df2, on='Accession', left_index=True)
@@ -232,13 +257,13 @@ def cofar2_Table(path_cofar,late_intro):
 
     df["PREGTERM"]=df["PREGTERM"].map({0: int(35),1:int(38)})
     df["PREGWEEK"]=df["PREGWEEK"].fillna(df["PREGTERM"])
-    df["birth weight kg"]=0.453592*df["BIRTHLBS"]+0.0283495+df["BIRTHOZS"]
+    df["birth weight kg"]=0.453592*df["BIRTHLBS"]+0.0283495*df["BIRTHOZS"]
     df.loc[df['BRSTFEXB'] <= 13, 'BRSTFEXB'] = int(0)
     df.loc[df['BRSTFEXB'] >= 13, 'BRSTFEXB'] = int(1)
     df["RACE"]=df["RACE"].map({1: int(0),2:int(3),3: int(2),5:int(4),99:int(1)})
     df["SEX"]=df["SEX"].map({1: int(0),2:int(1)})
-    df["FA_Egg"]=df["POSORLFO"].map({1: int(0),2:int(1),3:int(1)})
-    df["FA_Milk"]=df["POSORLFO"].map({1: int(1),2:int(0),3:int(1)})
+    df["FA_Egg"]=df["IN1AEVDN"].map({0:int(0),1: int(0),2:int(1),3:int(1)})
+    df["FA_Milk"]=df["IN1AEVDN"].map({0:int(0),1: int(1),2:int(0),3:int(1)})
 
     df = df.rename(columns={"MATASTM": "mother has asthma","MATATD": "mother has eczema", "MATFOOD": "mother has food allergy",
                             "PATASTM": "father has asthma", "PATATD": "father has eczema","PATFOOD": "father has food allergy",
@@ -247,16 +272,32 @@ def cofar2_Table(path_cofar,late_intro):
                             "SEX": "Child's sex", "FURPETSV":"any pets owned at enrolment","PNTCONFI":"FA_Peanut",
                             "SMOKERSV": "mother smoked during pregnancy","ATDMODSV":"SCORAD"
                             })
-    df["FA_general"]=np.logical_or(np.logical_or(df["FA_Egg"], df["FA_Milk"]), df["FA_Peanut"])
-    df["FA_general"]= df["FA_general"].map({True:int(1), False:int(0)})
+    # df=df.dropna(subset=["FA_Egg","FA_Milk","FA_Peanut"],thresh=3)
+    df["mother has asthma"]=df["mother has asthma"].map({9:None})
+    df["mother has eczema"]=df["mother has eczema"].map({9:None})
+    df["mother has food allergy"]=df["mother has food allergy"].map({9:None})
+    df["father has asthma"]=df["father has asthma"].map({9:None})
+    df["father has eczema"]=df["father has eczema"].map({9:None})
+    df["father has food allergy"]=df["father has food allergy"].map({9:None})
+
+    df["FA_general"]=df["FA_Egg"]+ df["FA_Milk"]+ df["FA_Peanut"]
+    df["FA_general"]= np.where(df["FA_general"]>0,1,0)#.map({True:int(1), False:int(0)})
 
     res = pd.get_dummies(df["ethnicity"], prefix='ethnicity')
     df = pd.concat([df, res], axis=1)
     df=df.rename(columns={"ethnicity_0.0": "ethnicity_0","ethnicity_1.0": "ethnicity_1","ethnicity_2.0": "ethnicity_2","ethnicity_3.0": "ethnicity_3","ethnicity_4.0": "ethnicity_4"})
     df["ethnicity_4"] = int(0)
 
-    df=df.drop(columns=["PREGTERM","POSORLFO","BIRTHOZS","BIRTHLBS","ethnicity","Accession"])
+    df=df.drop(columns=["PREGTERM","IN1AEVDN","ethnicity","BIRTHOZS","BIRTHLBS","Accession"])
+    # df=df.dropna(subset=["Child's sex", 'gestational age','mode of delivery','birth weight kg','Exclusively Breastfed','mother smoked during pregnancy','mother has eczema','mother has food allergy','mother has asthma','father has eczema','father has food allergy','father has asthma','any pets owned at enrolment'])
+    df=df.dropna(subset=["FA_general"])
+    # df["research"] = "CoFar"
+
     print("CoFar Study",df.shape)
+    # print('general', Counter(df["FA_general"]))
+    # print('MILK', Counter(df["FA_Milk"]))
+    # print('EGG', Counter(df["FA_Egg"]))
+    # print('PEANTUT', Counter(df["FA_Peanut"]))
     return df
 
 if __name__ == '__main__':
@@ -266,17 +307,23 @@ if __name__ == '__main__':
     path_cofar2="/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/Datasets/COFAR2/COFaR2_for_Risk_Score.xlsx"
 
     late_intro=False
+    df4=cofar2_Table(path_cofar2, late_intro)
     df1=Katz_db(path_KATZ, late_intro)
     df2=LEAP_db(path_LEAP, late_intro)
     df3=EAT_Table(path_EAT, late_intro)
-    df4=cofar2_Table(path_cofar2, late_intro)
     DF = pd.concat([df1, df2, df3,df4])
+    DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
+    DF=DF.dropna(thresh=16)
+    # df["mother has eczema"] = df["mother has eczema"].map({4:int(1), 9:int(1)})
+    print("DF",DF.shape)
+    print(Counter(DF["FA_general"]))
+
     # # DF["multi"]= np.logical_and(np.where(DF["SCORAD"].values > 0, 1, 0),np.where(DF["primary outcome positive (only those evaluable and within age range)"].values > 0, 1, 0))
     # # DF["multi"].replace(True, int(1), inplace=True)
     # # DF["multi"].replace(False, int(0), inplace=True)
     # # print("FA", Counter(np.where(DF["multi"] > 0, 1, 0)))
     # # DF=DF.drop(columns=["primary outcome positive (only those evaluable and within age range)","SCORAD"])
-    DF.to_excel(f"./ELK_tables{late_intro}.xlsx",index=False)
+    DF.to_excel(f"./02022021{late_intro}.xlsx",index=False)
 
     # DF1 = pd.concat([df2, df3])
     # DF1["multi"]= np.logical_and(np.where(DF1["SCORAD"].values > 0, 1, 0),np.where(DF1["primary outcome positive (only those evaluable and within age range)"].values > 0, 1, 0))
