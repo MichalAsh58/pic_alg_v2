@@ -53,8 +53,9 @@ def Savemodel_DNN(model,name):
     model.save(f'{path}/model')
     return path
 
-def Savemodel_RF(model,name):
-    path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-RF-{name}'
+def Savemodel_RF(model,name,auc):
+    auc=round(auc,2)
+    path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-RF-{name}{auc}'
     try:
         os.mkdir(path)
     except OSError:
@@ -470,7 +471,9 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     regressor.fit(X_train, y_train)
     y_pred = regressor.predict(X_test)
 
-    path=Savemodel_RF(regressor,name)
+    logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > 0, 1, 0), y_pred)))
+    fpr, tpr, thresholds = roc_curve(np.where(y_test > 0, 1, 0), y_pred)
+    path=Savemodel_RF(regressor,name,logit_roc_auc)
 
     plt.figure()
     plt.plot(y_test,y_pred,'o')
@@ -480,8 +483,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     # plt.show()
     plt.savefig(f'{path}/{name}-results-RandomForest.jpeg')
 
-    logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > 0, 1, 0), y_pred)))
-    fpr, tpr, thresholds = roc_curve(np.where(y_test > 0, 1, 0), y_pred)
+
 
     accuracy=[]
     specificity=[]
@@ -539,7 +541,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
         json.dump(parameters, fp)
 
 if __name__ == '__main__':
-    df=pd.read_excel("ELK_tablesFalse.xlsx")
+    df=pd.read_excel("02022021False.xlsx")
     types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     for t in types:
         X,y, fullname=Type(t,df)
@@ -553,7 +555,7 @@ if __name__ == '__main__':
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=parametrs_DNN["test_size"], stratify=y)
         Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=t,fullname=fullname)
-        DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
+        # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
     # FA, label, name,fullname=Type('AD')
     #

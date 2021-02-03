@@ -276,7 +276,7 @@ if __name__ == '__main__':
     # # DF["multi"].replace(False, int(0), inplace=True)
     # # print("FA", Counter(np.where(DF["multi"] > 0, 1, 0)))
     # # DF=DF.drop(columns=["primary outcome positive (only those evaluable and within age range)","SCORAD"])
-    DF.to_excel(f"./ELK_tables{late_intro}.xlsx",index=False)
+    DF.to_excel(f"./ELK_tables{late_intro}0302.xlsx",index=False)
 
     # DF1 = pd.concat([df2, df3])
     # DF1["multi"]= np.logical_and(np.where(DF1["SCORAD"].values > 0, 1, 0),np.where(DF1["primary outcome positive (only those evaluable and within age range)"].values > 0, 1, 0))
