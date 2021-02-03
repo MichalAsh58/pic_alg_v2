@@ -81,8 +81,8 @@ def Savemodel_DNN(model,name):
     model.save(f'{path}/model')
     return path
 
-def Savemodel_RF(model,name):
-    path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-RF-{name}'
+def Savemodel_RF(model,name,auc):
+    path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-RF-{name}{round(auc,2)}'
     try:
         os.mkdir(path)
     except OSError:
@@ -493,12 +493,19 @@ def DNN_regress(X_train,X_test,y_train,y_test, parameters,name,fullname):
         json.dump(parameters, fp)
 
 
-def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname):
+def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname,AD_thresh):
     regressor = RandomForestRegressor(n_estimators=parameters["n_estimators"], random_state=43,min_samples_leaf= 2, max_features="sqrt", max_depth= 12, bootstrap= True)
     regressor.fit(X_train, y_train)
     y_pred = regressor.predict(X_test)
 
-    path=Savemodel_RF(regressor,name)
+
+    try:
+        logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > AD_thresh, 1, 0), y_pred)))
+    except ValueError:
+        pass
+    fpr, tpr, thresholds = roc_curve(np.where(y_test > AD_thresh, 1, 0), y_pred)
+
+    path=Savemodel_RF(regressor,name,logit_roc_auc)
     # correlation_matrix(np.array(X_train,y_train), path)
 
     plt.figure()
@@ -509,14 +516,13 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     # plt.show()
     plt.savefig(f'{path}/{name}-results-RandomForest.jpeg')
 
-    logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > 0, 1, 0), y_pred)))
-    fpr, tpr, thresholds = roc_curve(np.where(y_test > 0, 1, 0), y_pred)
+
 
     accuracy=[]
     specificity=[]
     sensitivity=[]
     for threshold in thresholds:
-        tn, fp, fn, tp = confusion_matrix(np.where(y_test > 0, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
+        tn, fp, fn, tp = confusion_matrix(np.where(y_test > AD_thresh, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
         accuracy_score=(tn+tp)/(tn+fp+fn+tp)
         specificity_score = tn / (tn + fp)
         sensitivity_score=tp/(tp+fn)
@@ -561,12 +567,10 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     plt.title("Sensitivity vs. Specificity")
     plt.suptitle(f'{fullname}\n #of trees={parameters["n_estimators"]},Max accuracy={float("{:.2f}".format(max(accuracy)))}',fontsize=15)
     plt.savefig(f'{path}/{name}-RandomForest.jpeg')
-    return logit_roc_auc
 
-
-    parameters["AUC"]=logit_roc_auc
     with open(f'{path}/parameters.json', 'w') as fp:
         json.dump(parameters, fp)
+    # return logit_roc_auc
 
 def correlation_matrix(df,path):
     from matplotlib import pyplot as plt
@@ -593,41 +597,47 @@ def Validation_RF(model_path,X,y):
 
 
 if __name__ == '__main__':
-    path="./02022021False.xlsx"
+    path="./0302Trueno_dropAD.xlsx"
     DF=pd.read_excel(path)
+    print(DF.shape)
+    print(Counter(DF["SCORAD"]))
 
-    DF=DF.dropna()
+    # DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
+    drop_thresh=16
+    DF=DF.dropna(thresh=drop_thresh)
+    DF=impute_model_basic(DF)
     print(DF.shape)
     # df1=DF.fillna(DF.mean())
     # df2=impute_model_basic(DF)
     # df3=impute_model_progressive(DF)
     # df["gestational age"]=np.where(df["gestational age"]>=37,1,0)
     # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
+    y = DF["SCORAD"]
+    X = DF.drop(columns=["SCORAD"])
+    fullname = "Atopic dermatitis"
+    # X,y, fullname=Type("FA_general",df)
+    AD_thresh=10
+    y_bool = np.where(y > AD_thresh, 1, 0) #10,25
+    print(Counter(y))
 
     # for i,df in enumerate([df_dropna,df1,df2,df3]):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y_bool)
     for i in range(5):
-    # for t in range(100,900,50):
+        # for t in range(100,900,50):
         print(DF.shape)
-        y=DF["FA_general"]
-        X=DF.drop(columns=["FA_general"])
-        fullname="Food Allergy- general"
-        # X,y, fullname=Type("FA_general",df)
-        y=np.where(y > 0, 1, 0)
+
         test_size = 0.2
         epochs = 100
-        n_estimators = 250
+        n_estimators = (i+1)*200
         lr = 0.0001
 
         # Validation_RF("/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/2021-01-28 19:58:03.044301-RF-FA_general/model", X, y)
 
+        # parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
+        parametrs_RF = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
 
+        Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='AD',fullname=fullname,AD_thresh=AD_thresh)
 
-        parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-        parametrs_RF = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=parametrs_DNN["test_size"], stratify=y)
-        auc=Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='FA',fullname=fullname)
-        print(auc)
         # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
         # parametrs_RF = {"description": "gestational age- boolean", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
