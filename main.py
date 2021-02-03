@@ -541,7 +541,7 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
         json.dump(parameters, fp)
 
 if __name__ == '__main__':
-    df=pd.read_excel("02022021False.xlsx")
+    df=pd.read_excel("0302noCoFarFalse.xlsx")
     types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     for t in types:
         X,y, fullname=Type(t,df)
