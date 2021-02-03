@@ -307,23 +307,38 @@ if __name__ == '__main__':
     path_cofar2="/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/Datasets/COFAR2/COFaR2_for_Risk_Score.xlsx"
 
     late_intro=False
-    # df4=cofar2_Table(path_cofar2, late_intro)
+    df4=cofar2_Table(path_cofar2, late_intro)
     df1=Katz_db(path_KATZ, late_intro)
     df2=LEAP_db(path_LEAP, late_intro)
     df3=EAT_Table(path_EAT, late_intro)
-    DF = pd.concat([df1, df2, df3])
-    DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
-    DF=DF.dropna(thresh=16)
+    print(df3.dropna(thresh=16).shape)
+    print(df2.dropna(thresh=16).shape)
+    print(df1.dropna(thresh=16).shape)
+    print(df4.dropna(thresh=16).shape)
+
+
+    DF1 = pd.concat([df1, df2, df3])
+    print("DF1",DF1.shape)
+    DF1=DF1.dropna(thresh=16)
+    print("DF1",DF1.shape)
+
+    DF2 = pd.concat([df1, df2, df3,df4])
+    print("DF2",DF2.shape)
+    DF2=DF2.dropna(thresh=16)
+    print("DF2",DF2.shape)
+
+    # DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
+    # DF=DF.dropna(thresh=16)
     # df["mother has eczema"] = df["mother has eczema"].map({4:int(1), 9:int(1)})
-    print("DF",DF.shape)
-    print(Counter(DF["FA_general"]))
+    # print(Counter(DF["FA_general"]))
 
     # # DF["multi"]= np.logical_and(np.where(DF["SCORAD"].values > 0, 1, 0),np.where(DF["primary outcome positive (only those evaluable and within age range)"].values > 0, 1, 0))
     # # DF["multi"].replace(True, int(1), inplace=True)
     # # DF["multi"].replace(False, int(0), inplace=True)
     # # print("FA", Counter(np.where(DF["multi"] > 0, 1, 0)))
     # # DF=DF.drop(columns=["primary outcome positive (only those evaluable and within age range)","SCORAD"])
-    DF.to_excel(f"./0302noCoFar{late_intro}.xlsx",index=False)
+    DF1.to_excel(f"./0302{late_intro}.xlsx",index=False)
+    DF2.to_excel(f"./0302noCoFar{late_intro}.xlsx",index=False)
 
     # DF1 = pd.concat([df2, df3])
     # DF1["multi"]= np.logical_and(np.where(DF1["SCORAD"].values > 0, 1, 0),np.where(DF1["primary outcome positive (only those evaluable and within age range)"].values > 0, 1, 0))
