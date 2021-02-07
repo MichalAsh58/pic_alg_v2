@@ -60,15 +60,18 @@ def Type(type,df):
     col_names=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     col_names.remove(type)
     df=df.drop(columns=col_names)
-    df=df.dropna()
+    df=df.dropna(subset=[type])
     print(type, df.shape)
     y=df[type]
     print(Counter(np.where(y>0,1,0)))
     X=df.drop(columns=[type])
-    fullname = type.replace("FA", "Food Allergy")
+    fullname = type.replace("FA", "Food Allergy-")
     fullname = fullname.replace("_", " ")
     fullname = fullname.replace("SCORAD", "Atopic Dermatitis")
-    return X,y, fullname
+
+    data={"FA_Egg":"FA","FA_Milk":"FA","FA_Peanut":"FA","FA_general":"FA","SCORAD":"AD"}
+    name=data[type]
+    return df, fullname,name
 
 def Savemodel_DNN(model,name):
     path=f'/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/{datetime.datetime.now()}-DNN-{name}'
@@ -275,7 +278,6 @@ def binary_recall_specificity(y_true, y_pred, recall_weight, spec_weight):
 
     # custom_loss = lambda recall, spec: binary_recall_specificity(y_test, y_pred, recall, spec)
 
-
 def DNN(X_train,X_test,y_train,y_test,epochs):
 
     model= Sequential()
@@ -349,19 +351,6 @@ def DNN(X_train,X_test,y_train,y_test,epochs):
     plt.legend(loc="lower right")
     plt.savefig('Log_ROC')
     plt.show()
-
-# def focal_loss_lgb_f1_score(y_pred, y_test):
-#   y_pred = 1 / (1 + np.exp(-y_pred))
-#   binary_preds = [int(p>0) for p in y_pred]
-#   return 'f1', f1_score(y_test, binary_preds), True
-
-# def custom_loss(y_true, y_pred):
-#     a, g = 0.25, 1.
-#     p = 1 / (1 + K.exp(-y_pred))
-#     # calculate loss, using y_pred
-#     loss = K.mean(-(a * y_test + (1 - a) * (1 - y_test)) * ((1 - (y_test * p + (1 - y_test) * (1 - p))) ** g) * (
-#                 y_test * K.log(p) + (1 - y_test) * K.log(1 - p)))
-#     return loss
 
 def call(y_true, y_pred):
     # if not self.from_logits:
@@ -492,18 +481,17 @@ def DNN_regress(X_train,X_test,y_train,y_test, parameters,name,fullname):
     with open(f'{path}/parameters.json', 'w') as fp:
         json.dump(parameters, fp)
 
-
 def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname,AD_thresh):
     regressor = RandomForestRegressor(n_estimators=parameters["n_estimators"], random_state=43,min_samples_leaf= 2, max_features="sqrt", max_depth= 12, bootstrap= True)
     regressor.fit(X_train, y_train)
     y_pred = regressor.predict(X_test)
 
-
-    try:
-        logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > AD_thresh, 1, 0), y_pred)))
-    except ValueError:
-        pass
-    fpr, tpr, thresholds = roc_curve(np.where(y_test > AD_thresh, 1, 0), y_pred)
+    if name=="FA":
+        logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test > 0, 1, 0), y_pred)))
+        fpr, tpr, thresholds = roc_curve(np.where(y_test > 0, 1, 0), y_pred)
+    else:
+        logit_roc_auc = float("{:.2f}".format(roc_auc_score(np.where(y_test >= AD_thresh, 1, 0), y_pred)))
+        fpr, tpr, thresholds = roc_curve(np.where(y_test >= AD_thresh, 1, 0), y_pred)
 
     path=Savemodel_RF(regressor,name,logit_roc_auc)
     # correlation_matrix(np.array(X_train,y_train), path)
@@ -516,13 +504,14 @@ def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname
     # plt.show()
     plt.savefig(f'{path}/{name}-results-RandomForest.jpeg')
 
-
-
     accuracy=[]
     specificity=[]
     sensitivity=[]
     for threshold in thresholds:
-        tn, fp, fn, tp = confusion_matrix(np.where(y_test > AD_thresh, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
+        if name=="FA":
+            tn, fp, fn, tp = confusion_matrix(np.where(y_test >0, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
+        else:
+            tn, fp, fn, tp = confusion_matrix(np.where(y_test >= AD_thresh, 1, 0), np.where(y_pred >= threshold, 1, 0).reshape(-1)).ravel()
         accuracy_score=(tn+tp)/(tn+fp+fn+tp)
         specificity_score = tn / (tn + fp)
         sensitivity_score=tp/(tp+fn)
@@ -595,36 +584,65 @@ def Validation_RF(model_path,X,y):
 
     print(logit_roc_auc)
 
+def describe(df):
+    df=df.drop(columns=["research","count"])
+    df_allergan=df[df["FA_general"]>0]
+    df_NOTallergan=df[df["FA_general"]==0]
+    for index, DataFrame in enumerate([df,df_allergan,df_NOTallergan]):
+        df1=DataFrame.describe()#.to_excel("Describe/all_table.xlsx")
+
+        for i in DataFrame.columns:
+            # b=DataFrame[i].value_counts()  #Works like Counter, return a series
+            a=Counter(DataFrame[i])
+            print(i)
+            print(a)
+            df1.at['count', i] =a[0]
+        df1=df1.rename(index={"count": "Number of zeros"})
+        df1.to_excel(f"Describe/{index}-{DataFrame.shape[0]}_rows.xlsx")
+
+
+    # df_allergan.describe().to_excel("Describe/allergan.xlsx")
+    # df_NOTallergan.describe().to_excel("Describe/NOTallergan.xlsx")
+
 
 if __name__ == '__main__':
-    path="./0302Trueno_dropAD.xlsx"
-    DF=pd.read_excel(path)
-    print(DF.shape)
-    print(Counter(DF["SCORAD"]))
+    path="0402_drop_FA_general.xlsx"
+    df=pd.read_excel(path)
+    describe(df)
+    label="FA_general"
+    df=df.drop(columns=["research","count"])
 
-    # DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
+    # path="./0402Trueno_dropALL.xlsx"
+    # df=pd.read_excel(path)
+    # print(df.shape)
+    # label="FA_general"
+    # df,fullname,name=Type(label,df)
+    #
+    # # DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
     drop_thresh=16
-    DF=DF.dropna(thresh=drop_thresh)
-    DF=impute_model_basic(DF)
-    print(DF.shape)
-    # df1=DF.fillna(DF.mean())
-    # df2=impute_model_basic(DF)
-    # df3=impute_model_progressive(DF)
-    # df["gestational age"]=np.where(df["gestational age"]>=37,1,0)
-    # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
-    y = DF["SCORAD"]
-    X = DF.drop(columns=["SCORAD"])
-    fullname = "Atopic dermatitis"
-    # X,y, fullname=Type("FA_general",df)
-    AD_thresh=10
-    y_bool = np.where(y > AD_thresh, 1, 0) #10,25
-    print(Counter(y))
-
-    # for i,df in enumerate([df_dropna,df1,df2,df3]):
+    # df=df.dropna(thresh=drop_thresh)
+    # df=impute_model_basic(df)
+    # print(df.shape)
+    # # df1=DF.fillna(DF.mean())
+    # # df2=impute_model_basic(DF)
+    # # df3=impute_model_progressive(DF)
+    # # df["gestational age"]=np.where(df["gestational age"]>=37,1,0)
+    # # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
+    y = df[label]
+    X = df.drop(columns=[label])
+    fullname="Food Allergy- General"
+    name="FA"
+    # # X,y, fullname=Type("FA_general",df)
+    AD_thresh=1
+    y_bool = np.where(y >= AD_thresh, 1, 0) #10,25
+    # print(Counter(y))
+    # print(Counter(y_bool))
+    #
+    # # for i,df in enumerate([df_dropna,df1,df2,df3]):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y_bool)
     for i in range(5):
         # for t in range(100,900,50):
-        print(DF.shape)
+        print(df.shape)
 
         test_size = 0.2
         epochs = 100
@@ -634,9 +652,9 @@ if __name__ == '__main__':
         # Validation_RF("/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/2021-01-28 19:58:03.044301-RF-FA_general/model", X, y)
 
         # parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-        parametrs_RF = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
+        parametrs_RF = {f"description": f"Includes late intro array","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
 
-        Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name='AD',fullname=fullname,AD_thresh=AD_thresh)
+        Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=name,fullname=fullname,AD_thresh=AD_thresh)
 
         # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
 
