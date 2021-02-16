@@ -606,10 +606,10 @@ def describe(df):
 
 
 if __name__ == '__main__':
-    path="0402_drop_FA_general.xlsx"
+    path="1402_drop_AD.xlsx"
     df=pd.read_excel(path)
-    describe(df)
-    label="FA_general"
+    # describe(df)
+    label="SCORAD"
     df=df.drop(columns=["research","count"])
 
     # path="./0402Trueno_dropALL.xlsx"
@@ -630,10 +630,10 @@ if __name__ == '__main__':
     # # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     y = df[label]
     X = df.drop(columns=[label])
-    fullname="Food Allergy- General"
-    name="FA"
+    fullname="Atopic Dermatitis"
+    name="AD"
     # # X,y, fullname=Type("FA_general",df)
-    AD_thresh=1
+    AD_thresh=10
     y_bool = np.where(y >= AD_thresh, 1, 0) #10,25
     # print(Counter(y))
     # print(Counter(y_bool))
@@ -652,7 +652,7 @@ if __name__ == '__main__':
         # Validation_RF("/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/2021-01-28 19:58:03.044301-RF-FA_general/model", X, y)
 
         # parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-        parametrs_RF = {f"description": f"Includes late intro array","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
+        parametrs_RF = {f"description": f"Updated table","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
 
         Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=name,fullname=fullname,AD_thresh=AD_thresh)
 
