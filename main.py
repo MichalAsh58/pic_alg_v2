@@ -11,6 +11,7 @@ import keras.backend as K
 import keras
 from keras.models import Sequential
 from keras.layers import Dense
+from operator import itemgetter
 from keras.callbacks import ModelCheckpoint
 import math
 import numpy as np
@@ -396,7 +397,7 @@ def DNN_regress(X_train,X_test,y_train,y_test, parameters,name,fullname):
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=parameters["learning rate"]), loss='mse', run_eagerly=True, metrics=[call, 'mae'])
 
     # train model
-    history = model.fit(X_train, y_train, epochs=parameters["#epochs"], batch_size=32, validation_split=0.3)
+    history = model.fit(X_train, y_train, validation_split=parameters["valid_split"], epochs=parameters["#epochs"], batch_size=32)
     # plot metrics
     path=Savemodel_DNN(model,name)
 
@@ -484,6 +485,11 @@ def DNN_regress(X_train,X_test,y_train,y_test, parameters,name,fullname):
 def Random_forest_regress(X_train,X_test,y_train,y_test,parameters,name,fullname,AD_thresh):
     regressor = RandomForestRegressor(n_estimators=parameters["n_estimators"], random_state=43,min_samples_leaf= 2, max_features="sqrt", max_depth= 12, bootstrap= True)
     regressor.fit(X_train, y_train)
+
+    Gini=set(zip(X_test.columns,np.round(regressor.feature_importances_,2)))
+    parameters["Gini"]=str(sorted(Gini,key=itemgetter(1)))
+    print(Gini)
+
     y_pred = regressor.predict(X_test)
 
     if name=="FA":
@@ -584,32 +590,36 @@ def Validation_RF(model_path,X,y):
 
     print(logit_roc_auc)
 
-def describe(df):
+def describe(df,col_name, threshold):
     df=df.drop(columns=["research","count"])
-    df_allergan=df[df["FA_general"]>0]
-    df_NOTallergan=df[df["FA_general"]==0]
+    df_allergan=df[df[col_name]>threshold]
+    df_NOTallergan=df[df[col_name]<=threshold]
     for index, DataFrame in enumerate([df,df_allergan,df_NOTallergan]):
         df1=DataFrame.describe()#.to_excel("Describe/all_table.xlsx")
 
         for i in DataFrame.columns:
             # b=DataFrame[i].value_counts()  #Works like Counter, return a series
             a=Counter(DataFrame[i])
-            print(i)
-            print(a)
+            # print(i)
+            # print(a)
             df1.at['count', i] =a[0]
         df1=df1.rename(index={"count": "Number of zeros"})
-        df1.to_excel(f"Describe/{index}-{DataFrame.shape[0]}_rows.xlsx")
-
+        df1.to_excel(f"/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/FA_article/DescribeTable/AD{index}_{DataFrame.shape[0]}rows.xlsx")
 
     # df_allergan.describe().to_excel("Describe/allergan.xlsx")
     # df_NOTallergan.describe().to_excel("Describe/NOTallergan.xlsx")
 
 
 if __name__ == '__main__':
-    path="1402_drop_AD.xlsx"
+    path="2302_drop_AD.xlsx"
     df=pd.read_excel(path)
-    # describe(df)
     label="SCORAD"
+    AD_thresh=10
+    validation_split=0.2
+    test_size = 0.2
+    epochs = 100
+    lr = 0.0001
+    # describe(df,label, AD_thresh)
     df=df.drop(columns=["research","count"])
 
     # path="./0402Trueno_dropALL.xlsx"
@@ -619,44 +629,35 @@ if __name__ == '__main__':
     # df,fullname,name=Type(label,df)
     #
     # # DF=DF.drop(columns=["FA_Egg","FA_Milk","FA_Peanut","SCORAD"])
-    drop_thresh=16
-    # df=df.dropna(thresh=drop_thresh)
     # df=impute_model_basic(df)
     # print(df.shape)
     # # df1=DF.fillna(DF.mean())
     # # df2=impute_model_basic(DF)
     # # df3=impute_model_progressive(DF)
-    # # df["gestational age"]=np.where(df["gestational age"]>=37,1,0)
-    # # types=["FA_Egg","FA_Milk","FA_Peanut","FA_general","SCORAD"]
     y = df[label]
     X = df.drop(columns=[label])
     fullname="Atopic Dermatitis"
     name="AD"
     # # X,y, fullname=Type("FA_general",df)
-    AD_thresh=10
     y_bool = np.where(y >= AD_thresh, 1, 0) #10,25
     # print(Counter(y))
     # print(Counter(y_bool))
     #
     # # for i,df in enumerate([df_dropna,df1,df2,df3]):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y_bool)
-    for i in range(5):
+    for i in range(2):
         # for t in range(100,900,50):
         print(df.shape)
-
-        test_size = 0.2
-        epochs = 100
-        n_estimators = (i+1)*200
-        lr = 0.0001
+        n_estimators = (i + 1) * 200
 
         # Validation_RF("/home/michal/MYOR Dropbox/R&D/Allergies Product Development/Prediction/Algorithm_Beta/24_01_2021_models/2021-01-28 19:58:03.044301-RF-FA_general/model", X, y)
 
-        # parametrs_DNN = {f"description": f"Recover best conditions","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr}
-        parametrs_RF = {f"description": f"Updated table","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":drop_thresh, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
+        # parametrs_DNN = {f"description": f"Try","path":path, "test_size": test_size, "#epochs": epochs, "learning rate": lr,"valid_split":validation_split}
+        parametrs_RF = {f"description": f"Updated table","path":path, "test_size": test_size, "n_estimators": n_estimators, "Table":path,"drop_thresh":16, "fill_na_with": "impute_model_basic", "AD_threshold":AD_thresh, "Counter":str(Counter(y)), "table size":X.shape}
 
         Random_forest_regress(X_train, X_test, y_train, y_test,parametrs_RF, name=name,fullname=fullname,AD_thresh=AD_thresh)
 
-        # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=t,fullname=fullname)
+        # DNN_regress(X_train, X_test, y_train, y_test, parametrs_DNN,name=name,fullname=fullname)
 
         # parametrs_RF = {"description": "gestational age- boolean", "test_size": test_size, "n_estimators": n_estimators, "#epochs": epochs}
         #
